@@ -27,7 +27,7 @@ The notebook covers:
 
 The project uses the **Telco Customer Churn** dataset:
 
-`WA_Fn-UseC_-Telco-Customer-Churn.csv`
+`Telco-Customer-Churn.csv`
 
 The dataset contains **7,043 customers and 21 columns** before preprocessing.
 
