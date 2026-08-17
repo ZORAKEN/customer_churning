@@ -1,6 +1,5 @@
 
 
-````markdown
 # Customer Churn Prediction
 
 > End-to-end machine learning pipeline for predicting customer churn using Scikit-learn, SMOTE, XGBoost, hyperparameter optimization, and SHAP explainability.
@@ -109,28 +108,6 @@ The target is imbalanced, so the implementation focuses on metrics beyond accura
 
 ---
 
-### `CODE.ipynb`
-
-The notebook contains the complete implementation:
-
-```text
-1. Imports & Configuration
-2. Data Loading
-3. Data Cleaning
-4. Exploratory Data Analysis
-5. Train/Test Split
-6. Preprocessing Pipeline
-7. SMOTE Integration
-8. Baseline Model Comparison
-9. Cross-Validation
-10. Random Forest Tuning
-11. XGBoost Tuning
-12. Final Model Evaluation
-13. Feature Importance
-14. SHAP Explainability
-15. Model Serialization
-16. Prediction System
-```
 
 ---
 
@@ -140,30 +117,10 @@ The notebook contains the complete implementation:
 
 `customerID` is removed because it is an identifier rather than a predictive feature:
 
-```python
-df = df.drop(
-    columns=["customerID"]
-)
-```
-
 ## Converting `TotalCharges`
 
-`TotalCharges` is converted from an object/string column into numeric values:
+`TotalCharges` is converted from an object/string column into numeric values and missing values are then replaced using the median:
 
-```python
-df["TotalCharges"] = pd.to_numeric(
-    df["TotalCharges"],
-    errors="coerce"
-)
-```
-
-Missing values are then replaced using the median:
-
-```python
-df["TotalCharges"] = df["TotalCharges"].fillna(
-    df["TotalCharges"].median()
-)
-```
 
 ## Target encoding
 
