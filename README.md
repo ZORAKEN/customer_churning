@@ -1,423 +1,839 @@
-# customer_churning
-# Customer Churn Prediction using Machine Learning
+# Customer Churn Prediction
 
-A machine learning project for predicting whether a telecom customer is likely to churn based on customer demographics, services, contract information, and billing details.
 
-## 📌 Project Overview
+> End-to-end machine learning pipeline for predicting customer churn using Scikit-learn, SMOTE, XGBoost, hyperparameter optimization, and SHAP explainability.
 
-Customer churn is an important business problem for subscription-based companies. Identifying customers who are likely to leave can help businesses take preventive actions and improve customer retention.
 
-This project uses the **Telco Customer Churn** dataset and develops a classification pipeline to predict customer churn using multiple machine learning algorithms.
+## Overview
 
-The notebook covers:
 
-* Data loading and understanding
-* Exploratory Data Analysis (EDA)
-* Data cleaning and preprocessing
-* Categorical feature encoding
-* Train/test splitting
-* Handling class imbalance using SMOTE
-* Training multiple classification models
-* 5-fold cross-validation
-* Model evaluation
-* Saving and loading the trained model
-* Building a simple predictive system
+This project implements a complete customer churn prediction workflow, from raw data exploration and preprocessing to model training, hyperparameter optimization, explainability, and inference on new customer records.
 
-## 📊 Dataset
 
-The project uses the **Telco Customer Churn** dataset:
+The main focus of the implementation is building a **reproducible machine learning pipeline** rather than manually preprocessing data at different stages.
 
-`Telco-Customer-Churn.csv`
 
-The dataset contains **7,043 customers and 21 columns** before preprocessing.
+The final workflow is:
 
-Important features include:
 
-* `gender`
-* `SeniorCitizen`
-* `Partner`
-* `Dependents`
-* `tenure`
-* `PhoneService`
-* `MultipleLines`
-* `InternetService`
-* `OnlineSecurity`
-* `OnlineBackup`
-* `DeviceProtection`
-* `TechSupport`
-* `StreamingTV`
-* `StreamingMovies`
-* `Contract`
-* `PaperlessBilling`
-* `PaymentMethod`
-* `MonthlyCharges`
-* `TotalCharges`
-* `Churn`
+```text
+Raw Data
+   │
+   ▼
+Data Cleaning
+   │
+   ├── Remove customerID
+   ├── Convert TotalCharges → numeric
+   ├── Handle missing values
+   └── Encode Churn → 0 / 1
+   │
+   ▼
+Train / Test Split
+   │
+   ▼
+ColumnTransformer
+   │
+   ├── Numerical features
+   │
+   └── OneHotEncoder
+   │
+   ▼
+SMOTE
+   │
+   ▼
+Model
+   │
+   ├── Decision Tree
+   ├── Random Forest
+   └── XGBoost
+   │
+   ▼
+Cross-Validation
+   │
+   ▼
+Hyperparameter Tuning
+   │
+   ▼
+Tuned XGBoost
+   │
+   ├── Evaluation
+   ├── Feature Importance
+   ├── SHAP
+   └── Saved Prediction Pipeline
 
-The `customerID` column is removed because it is not required for modeling.
+```
+Project Goals
+
+The implementation is designed to answer the following questions:
+
+Can customer churn be predicted from customer demographics, services, contracts and billing information?
+Which classification algorithm performs best?
+How should categorical variables and class imbalance be handled?
+Which features have the greatest influence on churn predictions?
+Why does the model predict that an individual customer will churn?
+Can the trained model be reused to make predictions on new customers?
+Dataset```
+
+The project uses the Telco Customer Churn dataset.
 
 The target variable is:
 
-* `0` → No Churn
-* `1` → Churn
+Churn
+├── 0 → No churn
+└── 1 → Churn
 
-The original target distribution contains:
+The target is imbalanced, so the implementation does not rely on accuracy alone when evaluating models.
 
-* **5,174** customers who did not churn
-* **1,869** customers who churned
+Repository Structure
+customer_churning/
+│
+├── CODE.ipynb
+├── README.md
+├── Telco-Customer-Churn.csv
+├── customer_churn_model.pkl
+└── requirements.txt
+CODE.ipynb
 
-This indicates a class imbalance in the target variable.
+Contains the complete implementation:
 
-## 🔎 Exploratory Data Analysis
+1. Dependencies
+2. Data Loading & Understanding
+3. Data Cleaning
+4. Exploratory Data Analysis
+5. Data Preprocessing
+6. Model Training
+7. Random Forest Tuning
+8. XGBoost Tuning
+9. Feature Importance
+10. SHAP Explainability
+11. Model Serialization
+12. Prediction System
 
-The notebook performs exploratory analysis of both numerical and categorical features.
 
-The analysis includes:
 
-* Distribution analysis of numerical features
-* Box plots for numerical variables
-* Correlation heatmap
-* Count plots for categorical variables
-* Examination of unique values
-* Checking for missing values
+ Data Cleaning and Processing 
+Remove Identifier
 
-The numerical variables analyzed include:
+customerID is removed because it uniquely identifies a customer but does not provide meaningful predictive information:
 
-* `SeniorCitizen`
-* `tenure`
-* `MonthlyCharges`
-* `TotalCharges`
+df = df.drop(
+    columns=["customerID"]
+)
+Convert TotalCharges
 
-The notebook also identifies blank values in `TotalCharges`. These values are associated with customers whose tenure is zero, and the notebook replaces the missing `TotalCharges` values with `0`.
+TotalCharges is initially represented as a string/object column.
 
-## 🛠️ Data Preprocessing
+It is converted to numeric:
 
-The preprocessing pipeline consists of several steps.
+df["TotalCharges"] = pd.to_numeric(
+    df["TotalCharges"],
+    errors="coerce"
+)
 
-### 1. Remove unnecessary columns
+Any resulting missing values are replaced using the median:
 
-The `customerID` column is removed because it does not provide useful information for predicting churn.
+df["TotalCharges"] = df["TotalCharges"].fillna(
+    df["TotalCharges"].median()
+)
+Encode Target
 
-### 2. Handle `TotalCharges`
+The target is converted into a binary representation:
 
-`TotalCharges` is initially stored as an object/string column. Blank values are identified and replaced with `0`, after which the column is converted to a numerical representation.
+df["Churn"] = df["Churn"].map({
+    "No": 0,
+    "Yes": 1
+})
 
-### 3. Encode the target
+The resulting target is:
 
-The `Churn` column is converted from categorical values into binary values:
+0 → No Churn
+1 → Churn
+4. Exploratory Data Analysis
 
-```text
-Yes → 1
-No  → 0
-```
+The notebook performs exploratory analysis before model training.
 
-### 4. Encode categorical features
+Numerical Analysis
 
-Categorical columns are transformed using `LabelEncoder`.
+The numerical features are:
+
+numerical_features = [
+    "tenure",
+    "MonthlyCharges",
+    "TotalCharges"
+]
 
-The encoders are stored in a dictionary and saved to:
+Reusable functions are created for visual analysis.
+
+Histograms
+def plot_histogram(df, column_name):
+    plt.figure(figsize=(5, 3))
+    sns.histplot(
+        df[column_name],
+        kde=True
+    )
+    ...
+
+The function is then reused for:
+
+plot_histogram(df, "tenure")
+plot_histogram(df, "MonthlyCharges")
+plot_histogram(df, "TotalCharges")
+Box Plots
+
+A reusable box-plot function is also defined:
+
+def plot_boxplot(df, column_name):
+    plt.figure(figsize=(5, 3))
+    sns.boxplot(
+        y=df[column_name]
+    )
+    ...
+Correlation Analysis
 
-```text
-encoders.pkl
-```
+The numerical features are examined using a correlation heatmap:
 
-This allows the same encoding scheme to be reused when making predictions on new customer data.
+Categorical Analysis
 
-### 5. Train/test split
+Categorical variables are identified using:
+
+object_cols = (
+    df.select_dtypes(
+        include="object"
+    ).columns.to_list()
+)
+
+Categorical distributions are visualized using count plots.
+
+5. Train/Test Split
+
+The target is separated from the feature matrix:
+
+X = df.drop(
+    "Churn",
+    axis=1
+)
+
+
+y = df["Churn"]
+
+The dataset is split using an 80/20 stratified split:
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+Why stratification?
+
+The target is imbalanced, so stratify=y ensures that the training and test sets maintain a similar class distribution.
+
+6. Feature Preprocessing
+
+The implementation uses a ColumnTransformer to process numerical and categorical variables separately.
+
+Numerical Pipeline
+numeric_transformer = Pipeline([
+    (
+        "imputer",
+        SimpleImputer(
+            strategy="median"
+        )
+    )
+])
+Categorical Pipeline
+categorical_transformer = Pipeline([
+    (
+        "imputer",
+        SimpleImputer(
+            strategy="most_frequent"
+        )
+    ),
+    (
+        "onehot",
+        OneHotEncoder(
+            handle_unknown="ignore",
+            sparse_output=False
+        )
+    )
+])
 
-The dataset is divided into training and testing sets using:
+These transformations are combined using:
+
+preprocessor = ColumnTransformer([
+    (
+        "num",
+        numeric_transformer,
+        numerical_features
+    ),
+    (
+        "cat",
+        categorical_transformer,
+        categorical_features
+    )
+])
 
-* Training data: 80%
-* Test data: 20%
-* `random_state=42`
+This creates a single preprocessing object that can be reused consistently during training and inference.
+
+7. Handling Class Imbalance
+
+The churn target is imbalanced.
+
+Instead of manually oversampling the complete training dataset, SMOTE is integrated into the machine learning pipeline.
+
+from imblearn.pipeline import Pipeline as ImbPipeline
+from imblearn.over_sampling import SMOTE
+
 
-The resulting training set contains **5,634 records**, while the test set contains **1,409 records**.
+def make_pipeline(model):
 
-### 6. Handle class imbalance with SMOTE
 
-The training data is balanced using **Synthetic Minority Oversampling Technique (SMOTE)**.
+    return ImbPipeline([
+        (
+            "preprocessor",
+            preprocessor
+        ),
+        (
+            "smote",
+            SMOTE(
+                random_state=42
+            )
+        ),
+        (
+            "model",
+            model
+        )
+    ])
+
+The resulting architecture is:
+
+Input
+  ↓
+Preprocessing
+  ↓
+OneHotEncoder
+  ↓
+SMOTE
+  ↓
+Classifier
+
+This is important because preprocessing and resampling remain part of the model-fitting process used during cross-validation.
+
+8. Model Architecture
+
+Three models are evaluated using the same pipeline:
+
+models_pipeline = {
+
+
+    "Decision Tree": make_pipeline(
+        DecisionTreeClassifier(
+            random_state=42
+        )
+    ),
+
+
+    "Random Forest": make_pipeline(
+        RandomForestClassifier(
+            random_state=42,
+            n_jobs=-1
+        )
+    ),
+
+
+    "XGBoost": make_pipeline(
+        XGBClassifier(
+            random_state=42,
+            eval_metric="logloss",
+            n_jobs=-1
+        )
+    )
+}
+
+This ensures that model comparisons are performed using the same preprocessing and class-balancing strategy.
 
-Before SMOTE:
+9. Cross-Validation
 
-```text
-No Churn    4,138
-Churn       1,496
-```
+Five-fold stratified cross-validation is used:
 
-After SMOTE:
+cv = StratifiedKFold(
+    n_splits=5,
+    shuffle=True,
+    random_state=42
+)
 
-```text
-No Churn    4,138
-Churn       4,138
-```
+The primary scoring metric is F1-score for the churn class:
 
-SMOTE is applied only to the training data.
+churn_f1 = make_scorer(
+    f1_score,
+    pos_label=1
+)
 
-## 🤖 Machine Learning Models
+Each model is evaluated using:
+
+scores = cross_val_score(
+    model,
+    X_train,
+    y_train,
+    cv=cv,
+    scoring=churn_f1,
+    n_jobs=-1
+)
 
-Three classification algorithms are evaluated:
+This produces a mean and standard deviation of F1 across the validation folds.
 
-1. Decision Tree
-2. Random Forest
-3. XGBoost
+10. Hyperparameter Optimization
 
-The models are initially trained using their default hyperparameters.
+The strongest models are further optimized using RandomizedSearchCV.
 
-### Cross-Validation Results
+Random Forest
 
-5-fold cross-validation is performed on the SMOTE-balanced training data.
+The Random Forest search explores:
 
-| Model         | Cross-Validation Accuracy |
-| ------------- | ------------------------: |
-| Decision Tree |                      0.78 |
-| Random Forest |                      0.84 |
-| XGBoost       |                      0.83 |
+rf_params = {
+    "model__n_estimators": [
+        200, 300, 400
+    ],
+    "model__max_depth": [
+        None, 10, 15, 20
+    ],
+    "model__min_samples_split": [
+        2, 5, 10
+    ],
+    "model__min_samples_leaf": [
+        1, 2, 4
+    ],
+    "model__max_features": [
+        "sqrt", "log2"
+    ],
+    "model__class_weight": [
+        None, "balanced"
+    ]
+}
+
+The model is optimized using:
 
-Based on the cross-validation accuracy, **Random Forest** performs best among the three models tested.
+rf_search = RandomizedSearchCV(
+    rf_pipeline,
+    param_distributions=rf_params,
+    n_iter=10,
+    scoring=churn_f1,
+    cv=3,
+    random_state=42,
+    n_jobs=-1,
+    verbose=1
+)
+11. XGBoost Optimization
 
-## 🌲 Final Model
+XGBoost is tuned using a broader parameter search:
 
-The final model selected in the notebook is:
+xgb_params = {
 
-```text
-RandomForestClassifier(random_state=42)
-```
 
-The Random Forest model is trained using the SMOTE-balanced training dataset.
+    "model__n_estimators": [
+        200, 300, 500, 700
+    ],
 
-## 📈 Model Evaluation
 
-The trained Random Forest model is evaluated against the original test set.
+    "model__max_depth": [
+        3, 4, 5, 6
+    ],
 
-### Accuracy
 
-```text
-0.7786
-```
+    "model__learning_rate": [
+        0.01, 0.03, 0.05,
+        0.1, 0.2
+    ],
 
-Approximately **77.86% test accuracy**.
 
-### Confusion Matrix
+    "model__subsample": [
+        0.7, 0.8, 0.9, 1.0
+    ],
 
-```text
-[[878, 158],
- [154, 219]]
-```
 
-### Classification Report
+    "model__colsample_bytree": [
+        0.7, 0.8, 0.9, 1.0
+    ],
 
-| Class                | Precision | Recall | F1-Score |
-| -------------------- | --------: | -----: | -------: |
-| No Churn             |      0.85 |   0.85 |     0.85 |
-| Churn                |      0.58 |   0.59 |     0.58 |
-| **Overall Accuracy** |           |        | **0.78** |
 
-The model performs better at identifying customers who do not churn than customers who do churn.
+    "model__min_child_weight": [
+        1, 3, 5
+    ]
+}
 
-This difference is important because, in a real-world churn prediction application, improving recall for the churn class could be particularly valuable.
+The search is performed with:
 
-## 💾 Saved Model Artifacts
+xgb_search = RandomizedSearchCV(
+    xgb_pipeline,
+    param_distributions=xgb_params,
+    n_iter=30,
+    scoring=churn_f1,
+    cv=cv,
+    random_state=42,
+    n_jobs=-1,
+    verbose=1
+)
 
-The notebook saves two pickle files.
+The final tuned pipeline is retrieved using:
 
-### Trained model
+best_xgb = xgb_search.best_estimator_
+12. Final Model Evaluation
 
-```text
-customer_churn_model.pkl
-```
+The tuned XGBoost pipeline is evaluated against the held-out test set:
 
-This file contains:
+y_test_pred = best_xgb.predict(
+    X_test
+)
 
-* The trained Random Forest model
-* The feature names used during training
 
-### Encoders
+y_prob = best_xgb.predict_proba(
+    X_test
+)[:, 1]
 
-```text
-encoders.pkl
-```
+The following metrics are calculated:
 
-This file contains the `LabelEncoder` objects used to transform categorical features.
+accuracy_score(...)
+recall_score(...)
+f1_score(...)
+roc_auc_score(...)
+average_precision_score(...)
+confusion_matrix(...)
+classification_report(...)
+Final Test Results
+Metric	Score
+Accuracy	77.00%
+Recall	67.91%
+F1 Score	61.06%
+ROC-AUC	83.83%
+PR-AUC	63.97%
 
-Keeping the encoders is important because new prediction data must be transformed using the same encoding scheme as the training data.
+F1 and recall are emphasized because the objective is specifically to identify customers who are likely to churn.
 
-## 🔮 Predictive System
+13. Feature Importance
 
-The notebook demonstrates how to load the saved model and encoders and use them to predict churn for a new customer.
+The final XGBoost model is accessed from the fitted pipeline:
 
-The example customer has characteristics such as:
+preprocessor = (
+    best_xgb
+    .named_steps["preprocessor"]
+)
 
-* Female
-* Senior citizen: No
-* Partner: Yes
-* Tenure: 1 month
-* Internet service: DSL
-* Month-to-month contract
-* Electronic check payment
-* Monthly charges: 29.85
-* Total charges: 29.85
 
-The example prediction produced:
+xgb_model = (
+    best_xgb
+    .named_steps["model"]
+)
 
-```text
-Prediction: No Churn
-Prediction Probability: [[0.78 0.22]]
-```
+Because categorical variables have been one-hot encoded, the transformed feature names are retrieved from the fitted preprocessor:
 
-The model therefore predicted **No Churn**, with a predicted probability distribution of approximately 78% for no churn and 22% for churn.
+feature_names = (
+    preprocessor
+    .get_feature_names_out()
+)
 
-## 🧰 Technologies Used
+Feature importance is then calculated:
 
-* Python
-* NumPy
-* Pandas
-* Matplotlib
-* Seaborn
-* Scikit-learn
-* Imbalanced-learn
-* XGBoost
-* Pickle
+importance = pd.Series(
+    xgb_model.feature_importances_,
+    index=feature_names
+).sort_values(
+    ascending=False
+)
 
-### Main Libraries
+The top 15 features are visualized using a horizontal bar chart.
 
-```text
-numpy
-pandas
-matplotlib
-seaborn
-scikit-learn
+This provides a global view of which transformed features are most important to the XGBoost model.
+
+14. SHAP Explainability
+
+The project also uses SHAP to explain the final XGBoost model.
+
+The transformed test set is generated using the same fitted preprocessing pipeline:
+
+X_test_transformed = (
+    preprocessor.transform(X_test)
+)
+
+The transformed data is stored as a DataFrame with the generated feature names:
+
+X_test_transformed_df = pd.DataFrame(
+    X_test_transformed,
+    columns=feature_names,
+    index=X_test.index
+)
+
+A TreeExplainer is created for XGBoost:
+
+explainer = shap.TreeExplainer(
+    xgb_model
+)
+
+
+shap_values = explainer.shap_values(
+    X_test_transformed_df
+)
+
+A SHAP summary plot provides a global explanation of the model.
+
+An individual prediction can also be investigated using a waterfall plot:
+
+customer_index = 0
+
+
+shap.plots.waterfall(
+    shap.Explanation(
+        values=shap_values[
+            customer_index
+        ],
+        base_values=explainer.expected_value,
+        data=X_test_transformed_df.iloc[
+            customer_index
+        ],
+        feature_names=feature_names
+    ),
+    max_display=15
+)
+
+This allows the model to answer:
+
+Why did the model predict this customer as likely to churn?
+
+15. Model Serialization
+
+The complete tuned XGBoost pipeline is serialized using pickle:
+
+model_data = {
+    "model": best_xgb
+}
+
+
+with open(
+    "customer_churn_model.pkl",
+    "wb"
+) as f:
+
+
+    pickle.dump(
+        model_data,
+        f
+    )
+
+The important design decision here is that the entire pipeline is saved, rather than only the XGBoost classifier.
+
+Therefore the saved object contains:
+
+Preprocessor
+     │
+     ├── Numerical imputation
+     └── OneHotEncoder
+     
+SMOTE
+     │
+     ▼
+XGBoost
+
+This makes the model reusable for inference without manually repeating preprocessing.
+
+16. Loading the Model
+
+The saved pipeline can be restored with:
+
+with open(
+    "customer_churn_model.pkl",
+    "rb"
+) as f:
+
+
+    model_data = pickle.load(f)
+
+
+loaded_model = model_data["model"]
+
+The restored object is then ready to receive new customer records.
+
+17. Prediction System
+
+A new customer is represented using the original, human-readable feature values:
+
+input_data = {
+    "gender": "Female",
+    "SeniorCitizen": 0,
+    "Partner": "Yes",
+    "Dependents": "No",
+    "tenure": 1,
+    "PhoneService": "No",
+    "MultipleLines": "No phone service",
+    "InternetService": "DSL",
+    ...
+}
+
+The dictionary is converted to a DataFrame:
+
+input_data_df = pd.DataFrame(
+    [input_data]
+)
+
+The saved pipeline handles the preprocessing automatically:
+
+prediction = (
+    loaded_model
+    .predict(input_data_df)
+)
+
+
+pred_prob = (
+    loaded_model
+    .predict_proba(input_data_df)[:, 1]
+)
+
+The final result is displayed as:
+
+print(
+    f"Prediction: "
+    f"{'Churn' if prediction[0] == 1 else 'No Churn'}"
+)
+
+
+print(
+    f"Churn Probability: "
+    f"{pred_prob[0]:.2%}"
+)
+
+This means the prediction system does not require separate categorical encoders at inference time.
+
+Implementation Architecture
+
+The core implementation can be summarized as:
+
+                 ┌─────────────────────┐
+                 │   Raw Customer Data  │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │    Data Cleaning    │
+                 │                     │
+                 │ TotalCharges        │
+                 │ Missing Values      │
+                 │ customerID          │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Train/Test Split    │
+                 │    stratify=y       │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+              ┌─────────────────────────────┐
+              │      ColumnTransformer      │
+              │                             │
+              │ Numerical → Imputer         │
+              │ Categorical → OneHotEncoder│
+              └──────────────┬──────────────┘
+                             │
+                             ▼
+                     ┌─────────────┐
+                     │    SMOTE    │
+                     └──────┬──────┘
+                            │
+                            ▼
+                     ┌─────────────┐
+                     │  XGBoost    │
+                     └──────┬──────┘
+                            │
+                ┌───────────┼───────────┐
+                ▼           ▼           ▼
+           Evaluation   Feature      SHAP
+                        Importance
+                            │
+                            ▼
+                     Model Serialization
+                            │
+                            ▼
+                    Prediction System
+Why This Implementation?
+Pipeline-based preprocessing
+
+Preprocessing is encapsulated in a reusable pipeline instead of manually transforming training and test data separately.
+
+ColumnTransformer
+
+Numerical and categorical features require different preprocessing strategies, so they are handled independently before being combined.
+
+OneHotEncoder
+
+Categorical variables are one-hot encoded while handle_unknown="ignore" allows the pipeline to process previously unseen categories during inference.
+
+SMOTE inside the pipeline
+
+SMOTE is integrated into the imblearn pipeline so that oversampling is performed as part of model fitting rather than manually modifying the complete dataset.
+
+Stratified cross-validation
+
+StratifiedKFold maintains the class distribution across validation folds.
+
+F1-based model selection
+
+F1-score is used as the main optimization metric because identifying the minority churn class is more important than maximizing raw accuracy.
+
+Nested parameter names
+
+Hyperparameters are specified using:
+
+model__parameter
+
+because the classifier is a named step inside the pipeline.
+
+Pipeline serialization
+
+The complete preprocessing and modelling workflow is saved as one object, making inference consistent with training.
+
+Explainability
+
+Feature importance and SHAP provide both global and individual explanations of the final model.
+
+Technologies
+Python
+Pandas
+NumPy
+Scikit-learn
 imbalanced-learn
-xgboost
-```
+XGBoost
+SHAP
+Matplotlib
+Seaborn
+Jupyter Notebook
+Installation
 
-## 🚀 Getting Started
+Clone the repository:
 
-### 1. Clone the repository
+git clone https://github.com/ZORAKEN/customer_churning.git
 
-```bash
-git clone <your-repository-url>
-cd <your-repository-name>
-```
 
-### 2. Install dependencies
+cd customer_churning
 
-```bash
-pip install numpy pandas matplotlib seaborn scikit-learn imbalanced-learn xgboost
-```
+Install dependencies:
 
-### 3. Add the dataset
+pip install numpy pandas matplotlib seaborn scikit-learn imbalanced-learn xgboost shap
 
-Place the Telco Customer Churn CSV file in the location expected by the notebook:
+Launch Jupyter:
 
-```text
-WA_Fn-UseC_-Telco-Customer-Churn.csv
-```
-
-The notebook currently loads it using:
-
-```python
-pd.read_csv("/content/WA_Fn-UseC_-Telco-Customer-Churn.csv")
-```
-
-If running locally, update the path accordingly.
-
-### 4. Run the notebook
+jupyter notebook
 
 Open:
 
-```text
-Customer_Churn_Prediction_using_ML.ipynb
-```
+CODE.ipynb
 
-You can run the notebook using Jupyter Notebook, JupyterLab, or Google Colab.
+Results
 
-## 📁 Suggested Repository Structure
+The final tuned XGBoost model achieved:
 
-```text
-customer-churn-prediction/
-│
-├── Customer_Churn_Prediction_using_ML.ipynb
-├── WA_Fn-UseC_-Telco-Customer-Churn.csv
-├── customer_churn_model.pkl
-├── encoders.pkl
-├── README.md
-└── requirements.txt
-```
+Accuracy    : 77.00%
+Recall      : 67.91%
+F1 Score    : 61.06%
+ROC-AUC     : 83.83%
+PR-AUC      : 63.97%
 
-A `requirements.txt` file can contain:
-
-```text
-numpy
-pandas
-matplotlib
-seaborn
-scikit-learn
-imbalanced-learn
-xgboost
-```
-
-## 🔄 Machine Learning Workflow
-
-```text
-Raw Customer Data
-        ↓
-Data Loading
-        ↓
-Data Understanding
-        ↓
-Remove Customer ID
-        ↓
-Handle TotalCharges
-        ↓
-Exploratory Data Analysis
-        ↓
-Encode Target & Categorical Features
-        ↓
-Train/Test Split
-        ↓
-SMOTE on Training Data
-        ↓
-Train Decision Tree / Random Forest / XGBoost
-        ↓
-5-Fold Cross-Validation
-        ↓
-Select Random Forest
-        ↓
-Evaluate on Test Data
-        ↓
-Save Model + Encoders
-        ↓
-Predict Churn for New Customers
-```
-
-## 📌 Current Limitations
-
-The current notebook is a working baseline rather than a fully optimized production model.
-
-The notebook itself identifies several areas for future improvement:
-
-* Hyperparameter tuning
-* Further model selection
-* Downsampling experiments
-* Addressing potential overfitting
-* Stratified K-Fold cross-validation
-
-The current final Random Forest model achieves strong overall accuracy, but its recall for the churn class is only **0.59**, leaving room for improvement in identifying customers who are actually at risk of churning.
-
-## 🔮 Future Improvements
-
-Potential next steps include:
-
-1. Perform systematic hyperparameter tuning for Random Forest and XGBoost.
-2. Compare additional classification algorithms.
-3. Experiment with downsampling as an alternative to SMOTE.
-4. Investigate and reduce model overfitting.
-5. Use Stratified K-Fold cross-validation.
-6. Evaluate additional metrics such as ROC-AUC, precision, recall, and F1-score.
-7. Improve churn-class recall.
-8. Build a reusable prediction script or web application around the saved model.
-9. Create a proper preprocessing pipeline to make training and inference more consistent.
-
-## 📜 License
-
-This project is intended for educational and portfolio purposes. Add an appropriate license to the repository if you plan to distribute or modify the project publicly.
+The model is designed around the practical objective of identifying customers who are at risk of churn rather than optimizing accuracy alone.
